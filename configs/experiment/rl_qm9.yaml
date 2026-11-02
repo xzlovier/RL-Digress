@@ -1,0 +1,66 @@
+# @package _global_
+# RL Fine-Tuning Experiment Config for QM9 (no hydrogens)
+# CHE657 Group Project
+
+general:
+    name: 'rl_qm9_no_h'
+    gpus: 1
+    wandb: 'online'
+    test_only: null
+    evaluate_all_checkpoints: False
+    # ===== Sampling settings (used during RL evaluation) =====
+    samples_to_generate: 256
+    samples_to_save: 20
+    chains_to_save: 1
+    final_model_samples_to_generate: 5000
+    final_model_samples_to_save: 30
+    final_model_chains_to_save: 5
+
+train:
+    batch_size: 32      # Smaller for RL (each forward pass requires more memory due to gradients)
+    save_model: True
+    n_epochs: 0         # We don't run standard training epochs in RL phase
+
+model:
+    n_layers: 9
+    lambda_train: [5, 0]
+    diffusion_steps: 500
+    diffusion_noise_schedule: 'cosine'
+    transition: 'marginal'
+    extra_features: 'all'
+    hidden_mlp_dims: {'X': 256, 'E': 128, 'y': 128}
+    hidden_dims: {'dx': 256, 'de': 64, 'dy': 64, 'n_head': 8, 'dim_ffX': 256, 'dim_ffE': 128, 'dim_ffy': 128}
+
+dataset:
+    remove_h: True
+    pin_memory: True
+    num_workers: 4        # Fewer workers for RL (less data loading)
+
+# ===== RL-Specific Configuration =====
+rl:
+    # Pre-trained DiGress checkpoint to start RL from
+    # Set this to your trained Phase 1 checkpoint path
+    checkpoint_path: null   # e.g., 'outputs/2026-11-XX/XX-XX-XX-qm9_no_h/checkpoints/qm9_no_h/epoch=999.ckpt'
+
+    # Training parameters
+    n_episodes: 2000        # Total number of RL training episodes
+    rl_batch_size: 32       # Molecules sampled per RL step
+    rl_lr: 0.00001          # Very small LR — prevents catastrophic forgetting of chemistry
+    grad_clip: 1.0          # Max gradient norm for clipping
+
+    # Reward function parameters
+    alpha_qed: 0.7          # Weight for QED term in reward
+    beta_logp: 0.3          # Weight for logP Gaussian reward term
+    logp_target: 3.5        # Center of Gaussian logP reward (optimal oral drug logP ≈ 2–5)
+    logp_sigma: 1.5         # Width of Gaussian logP reward
+
+    # Optional: KL divergence penalty to prevent reward hacking
+    # Penalizes how much the fine-tuned model deviates from the base model
+    use_kl_penalty: false
+    kl_penalty_weight: 0.1
+
+    # Logging
+    log_every: 10           # Log metrics every N episodes
+    save_every: 100         # Save checkpoint every N episodes
+    eval_every: 200         # Run full evaluation every N episodes
+    eval_n_molecules: 1000  # Molecules to generate for evaluation
